@@ -56,7 +56,6 @@ Executor::instantiate(Runtime::Instance::ComponentImportManager &ImportMgr,
     const auto &Desc = Import.getDesc();
     switch (Desc.getDescType()) {
     case AST::Component::ExternDesc::DescType::CoreType:
-    case AST::Component::ExternDesc::DescType::FuncType:
     case AST::Component::ExternDesc::DescType::ValueBound:
     case AST::Component::ExternDesc::DescType::TypeBound:
     case AST::Component::ExternDesc::DescType::ComponentType:
@@ -64,6 +63,17 @@ Executor::instantiate(Runtime::Instance::ComponentImportManager &ImportMgr,
       spdlog::error(ErrCode::Value::ComponentNotImplInstantiate);
       spdlog::error("    incomplete import {} desc types"sv, Import.getName());
       return Unexpect(ErrCode::Value::ComponentNotImplInstantiate);
+    case AST::Component::ExternDesc::DescType::FuncType: {
+      auto CompName = Import.getName();
+      auto *ImportedFuncInst = ImportMgr.findFunction(CompName);
+      if (unlikely(ImportedFuncInst == nullptr)) {
+        spdlog::error(ErrCode::Value::UnknownImport);
+        spdlog::error("    component name: {}"sv, CompName);
+        return Unexpect(ErrCode::Value::UnknownImport);
+      }
+      CompInst.addFunction(ImportedFuncInst);
+      break;
+    }
     case AST::Component::ExternDesc::DescType::InstanceType: {
       // TODO: COMPONENT - type matching for the instance type.
       auto CompName = Import.getName();
