@@ -384,6 +384,67 @@ TEST(SerializeSectionTest, SerializeTagSection) {
   };
   EXPECT_EQ(Output, Expected);
 }
+TEST(SerializeSectionTest, SerializeLargeSection) {
+  WasmEdge::AST::TypeSection TypeSec;
+  // Add 130 function types to trigger multi-byte LEB128 vector length encoding.
+  WasmEdge::AST::FunctionType FT({}, {}); // () -> ()
+  for (int i = 0; i < 130; ++i) {
+    TypeSec.getContent().push_back(FT);
+  }
+
+  std::vector<uint8_t> Output;
+  EXPECT_TRUE(Ser.serializeSection(TypeSec, Output));
+
+  // The FT byte size is 3 (0x60, 0x00, 0x00).
+  // Total content size: 2 bytes for vector length (130 -> 0x82, 0x01) + 130 * 3 = 392 bytes.
+  // 392 -> LEB128: 0x88, 0x03.
+  std::vector<uint8_t> Expected;
+  Expected.push_back(0x01U); // Type section ID
+  Expected.push_back(0x88U); // Content size LEB128 byte 1
+  Expected.push_back(0x03U); // Content size LEB128 byte 2
+  Expected.push_back(0x82U); // Vector length LEB128 byte 1
+  Expected.push_back(0x01U); // Vector length LEB128 byte 2
+  for (int i = 0; i < 130; ++i) {
+    Expected.push_back(0x60U);
+    Expected.push_back(0x00U);
+    Expected.push_back(0x00U);
+  }
+
+  EXPECT_EQ(Output, Expected);
+}
+
+TEST(SerializeSectionTest, SerializeSectionNegative) {
+  WasmEdge::Configure ConfNoSIMD;
+  ConfNoSIMD.removeProposal(WasmEdge::Proposal::SIMD);
+  WasmEdge::Loader::Serializer SerNoSIMD(ConfNoSIMD);
+
+  WasmEdge::AST::TypeSection TypeSec;
+  WasmEdge::AST::FunctionType FT(
+      {}, std::vector<WasmEdge::ValType>{WasmEdge::TypeCode::V128});
+  TypeSec.getContent().push_back(FT);
+
+  std::vector<uint8_t> Output;
+  // Should fail because SIMD is disabled but V128 is used in FunctionType.
+  // This verifies that serialization errors bubble up gracefully from child types.
+  EXPECT_FALSE(SerNoSIMD.serializeSection(TypeSec, Output));
+}
+
+TEST(SerializeSectionTest, SerializeDataCountSectionNegative) {
+  WasmEdge::Configure ConfNoBulkMemRefType;
+  ConfNoBulkMemRefType.removeProposal(WasmEdge::Proposal::GC);
+  ConfNoBulkMemRefType.removeProposal(WasmEdge::Proposal::FunctionReferences);
+  ConfNoBulkMemRefType.removeProposal(WasmEdge::Proposal::BulkMemoryOperations);
+  ConfNoBulkMemRefType.removeProposal(WasmEdge::Proposal::ReferenceTypes);
+  WasmEdge::Loader::Serializer SerNoBulkMemRefType(ConfNoBulkMemRefType);
+
+  WasmEdge::AST::DataCountSection DataCntSec;
+  DataCntSec.setContent(42);
+
+  std::vector<uint8_t> Output;
+  // Should fail natively inside serial_section.cpp because DataCountSection
+  // explicitly requires BulkMemoryOperations or ReferenceTypes proposals.
+  EXPECT_FALSE(SerNoBulkMemRefType.serializeSection(DataCntSec, Output));
+}
 } // namespace
 
 GTEST_API_ int main(int argc, char **argv) {
