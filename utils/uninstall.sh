@@ -42,7 +42,7 @@ ASK=1
 usage() {
     cat <<EOF
     Usage: $0 -p </path/to/uninstall> [-V]
-    WasmEdge uninstallation and extensions uninstall.
+    WasmEdge uninstallation.
     Mandatory arguments to long options are mandatory for short options too.
     Long options should be assigned with '='
 
@@ -69,13 +69,6 @@ usage() {
     - wasmedge is the runtime that executes the wasm program or the AOT compiled
       so program.
 
-    - wasmedgec-tensorflow is the AOT compiler that compiles WebAssembly
-      bytecode programs (wasm programs) into native code (so program) on your
-      deployment machine. It is aware of WamsEdge's Tensorflow extension API.
-
-    - wasmedge-tensorflow-lite is the runtime that executes the wasm program or
-      the AOT compiled so program with the Tensorflow Lite library.
-
 EOF
 }
 
@@ -99,6 +92,10 @@ parse_env() {
     if [ -f "$IPATH/env" ]; then
         _COUNT_=$((_COUNT_ + 1))
         echo "$IPATH/env"
+    fi
+    if [ -f "$IPATH/env.fish" ]; then
+        _COUNT_=$((_COUNT_ + 1))
+        echo "$IPATH/env.fish"
     fi
     if [ $_COUNT_ -lt 2 ]; then
         echo "_ERROR_ : Found $_COUNT_ file(s) only"
@@ -258,9 +255,9 @@ main() {
       fi
     }
 
-    for file in "${__HOME__}/${_shell_rc}" "${__HOME__}/.profile" "${__HOME__}/.bash_profile"; do
+    for file in "${__HOME__}/${_shell_rc}" "${__HOME__}/.profile" "${__HOME__}/.bash_profile" "${__HOME__}/.config/fish/config.fish"; do
       [[ -f "$file" ]] || continue
-      line_num="$(grep -n ". \"${IPATH}/env\"" "$file" | cut -d : -f 1)"
+      line_num="$(grep -nE "(\. \"${IPATH}/env\"|source \"${IPATH}/env\.fish\")" "$file" | cut -d : -f 1)"
       [[ -n "$line_num" ]] || continue
       real_file="$(resolve_path "$file")"
       cp "$real_file" "$real_file.bak"

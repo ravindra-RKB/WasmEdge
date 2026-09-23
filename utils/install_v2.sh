@@ -149,7 +149,7 @@ if [ "$__HOME__" = "" ]; then
 fi
 
 get_latest_release() {
-	echo "0.14.1"
+	echo "0.17.1"
 }
 
 # Compare semantic versions
@@ -243,6 +243,30 @@ GGML_BUILD_NUMBER=""
 BY_PASS_CUDA_VERSION="0"
 BY_PASS_CUDART="0"
 
+set_ENV_fish() {
+	ENV_FISH="#!/usr/bin/env fish
+# wasmedge shell setup
+if not contains \"$1/bin\" \$PATH
+    set -x PATH \"$1/bin\" \$PATH
+end
+if not contains \"$1/lib\" \$${_LD_LIBRARY_PATH_}
+    set -x ${_LD_LIBRARY_PATH_} \"$1/lib\" \$${_LD_LIBRARY_PATH_}
+end
+if not contains \"$1/lib\" \$LIBRARY_PATH
+    set -x LIBRARY_PATH \"$1/lib\" \$LIBRARY_PATH
+end
+if not contains \"$1/include\" \$C_INCLUDE_PATH
+    set -x C_INCLUDE_PATH \"$1/include\" \$C_INCLUDE_PATH
+end
+if not contains \"$1/include\" \$CPLUS_INCLUDE_PATH
+    set -x CPLUS_INCLUDE_PATH \"$1/include\" \$CPLUS_INCLUDE_PATH
+end
+if not set -q WASMEDGE_LIB_DIR
+    set -x WASMEDGE_LIB_DIR \"$1/lib\"
+end
+"
+}
+
 set_ENV() {
 	ENV="#!/bin/sh
 	# wasmedge shell setup
@@ -318,7 +342,7 @@ usage() {
 	-l,             --legacy                        Enable legacy OS support.
 														E.g., CentOS 7.
 
-	-v,             --version=[0.14.1]              Install the specific version.
+	-v,             --version=[0.17.1]              Install the specific version.
 
 	-V,             --verbose                       Run script in verbose mode.
 														Will print out each step
@@ -607,6 +631,10 @@ main() {
 	# Set up the plugin folder if the installation path is not in the system path
 	[[ "$IPATH" =~ ^"/usr" ]] || mkdir -p "$IPATH/plugin"
 
+set_ENV_fish "$IPATH"
+	echo "$ENV_FISH" >"$IPATH/env.fish"
+	echo "# Please do not edit comments below this for uninstallation purpose" >> "$IPATH/env.fish"
+
 	echo "$ENV" >"$IPATH/env"
 	echo "# Please do not edit comments below this for uninstallation purpose" >> "$IPATH/env"
 
@@ -628,7 +656,7 @@ main() {
 	elif [[ "$_shell_" =~ "bash" ]]; then
 		local _grep1=$(cat "$__HOME__/.bash_profile" 2>/dev/null | grep "$IPATH/env")
 		local _grep2=$(cat "$__HOME__/.bash_login" 2>/dev/null | grep "$IPATH/env")
-		local _grep3=$(cat "$__HOME__/.profile" 2>/dev/null | grep "$IPATH/env")
+local _grep3=$(cat "$__HOME__/.profile" 2>/dev/null | grep "$IPATH/env")
 
 		if [ -f "$__HOME__/.bash_profile" ]; then
 			[ "$_grep1" = "" ] && echo "$_source" >>"$__HOME__/.bash_profile"
@@ -640,11 +668,20 @@ main() {
 				echo "$_source" >>"$__HOME__/.profile"
 			fi
 		fi
+	elif [[ "$_shell_" =~ "fish" ]]; then
+		local _grep=$(cat "$__HOME__/.config/fish/config.fish" 2>/dev/null | grep "$IPATH/env.fish")
+		if [ "$_grep" = "" ]; then
+			mkdir -p "$__HOME__/.config/fish"
+			touch "$__HOME__/.config/fish/config.fish"
+			echo "source \"$IPATH/env.fish\"" >>"$__HOME__/.config/fish/config.fish"
+		fi
 	fi
 
-	local _grep=$(cat "$__HOME__/$_shell_rc" | grep "$IPATH/env")
-	if [ "$_grep" = "" ]; then
-		[ -f "$__HOME__/$_shell_rc" ] && echo "$_source" >>"$__HOME__/$_shell_rc"
+	if [[ ! "$_shell_" =~ "fish" ]]; then
+		local _grep=$(cat "$__HOME__/$_shell_rc" 2>/dev/null | grep "$IPATH/env")
+		if [ "$_grep" = "" ]; then
+			[ -f "$__HOME__/$_shell_rc" ] && echo "$_source" >>"$__HOME__/$_shell_rc"
+		fi
 	fi
 
 	if [ -d "$IPATH" ]; then
