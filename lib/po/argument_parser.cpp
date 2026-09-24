@@ -239,6 +239,12 @@ void ArgumentParser::SubCommandDescriptor::indent_output(
       } else {
         Desc = {};
       }
+    } else {
+      for (std::size_t I = 0; I < IndentCount; ++I) {
+        fmt::print(Out, "{}"sv, kIndent);
+      }
+      fmt::print(Out, "{}\n"sv, Desc.substr(0, Width));
+      Desc = Desc.substr(Width);
     }
   }
   if (!Desc.empty()) {

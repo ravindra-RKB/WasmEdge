@@ -66,3 +66,14 @@ TEST(Help, Simple2) {
   EXPECT_FALSE(Parser.isVersion());
   EXPECT_TRUE(Parser.isHelp());
 }
+
+TEST(Help, WrapsLongUnbrokenDescription) {
+  const std::string DescriptionText(100, 'x');
+  Option<Toggle> Opt(Description{DescriptionText});
+  ArgumentParser Parser;
+  Parser.add_option("a"sv, Opt);
+  
+  std::array Args = {"test", "--help"};
+  EXPECT_TRUE(Parser.parse(stdout, static_cast<int>(Args.size()), Args.data()));
+  EXPECT_TRUE(Parser.isHelp());
+}
